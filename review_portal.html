@@ -729,7 +729,51 @@ function PhotoFolderUpload({ photoMap, onPhotosLoaded }) {
   );
 }
 
-// ─── Week Session helpers (in-memory, no localStorage) ───────────────────────
+// ─── Shared Backend Configuration ────────────────────────────────────────────────
+const SHARED_API_URL = "https://script.google.com/macros/s/AKfycbxv8Y30ThaDcxzCymkMxtMm3gTsmAnisF0yhZDI2au2VUNYc9Ypwkevat03tI1KimeP4w/exec"; // ← paste your Apps Script /exec URL here after deploying
+
+function getReviewerEmail() {
+  let email = sessionStorage.getItem("sc_reviewer_email");
+  if (!email || !email.endsWith(".gov")) {
+    let input = "";
+    while (!input || !input.includes("@") || !input.endsWith(".gov")) {
+      input = prompt(
+        !input
+          ? "Enter your .gov email address to log in:"
+          : "❌ Must be a .gov email address. Please try again:",
+        input || ""
+      );
+      if (input === null) { input = "unknown@unknown.gov"; break; } // cancelled
+      input = input.trim().toLowerCase();
+    }
+    sessionStorage.setItem("sc_reviewer_email", input);
+    email = input;
+  }
+  return email;
+}
+
+async function apiGetStatuses(weekKey) {
+  if (!SHARED_API_URL) return {};
+  try {
+    const res = await fetch(`${SHARED_API_URL}?weekKey=${encodeURIComponent(weekKey)}`);
+    const data = await res.json();
+    return data.statuses || {};
+  } catch(e) { console.warn("Could not load shared statuses:", e); return {}; }
+}
+
+async function apiSetStatus(weekKey, parcelId, status, reviewer) {
+  if (!SHARED_API_URL) return;
+  try {
+    await fetch(SHARED_API_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekKey, parcelId, status, reviewer }),
+    });
+  } catch(e) { console.warn("Could not save to shared backend:", e); }
+}
+
+// ─── Week Session helpers ───────────────────────
 // Sessions are stored as: { [weekKey]: { label, mismatches, perfects, statuses, windowId, createdAt } }
 // weekKey = "YYYY-WNN" e.g. "2026-W10"
 
@@ -833,14 +877,23 @@ function App() {
   const currentWeekKey = useMemo(() => getISOWeekKey(), []);
 
   // ── When user opens portal for a week, load that session's statuses ───────
-  const openPortal = useCallback((weekKey) => {
+  const openPortal = useCallback(async (weekKey) => {
     const sess = sessions[weekKey];
     if (!sess) return;
     setPortalWeek(weekKey);
-    setStatuses(sess.statuses || {});
-    setPortalPhotos(photoMap); // photos stay in memory from upload step
+    setPortalPhotos(photoMap);
     setView("portal");
     setPage(0);
+    // Load from local state first (instant), then sync from shared backend
+    setStatuses(sess.statuses || {});
+    if (SHARED_API_URL) {
+      const shared = await apiGetStatuses(weekKey);
+      if (Object.keys(shared).length > 0) {
+        // Merge: shared backend is authoritative
+        setStatuses(shared);
+        setSessions(s => ({...s,[weekKey]:{...s[weekKey],statuses:shared}}));
+      }
+    }
   }, [sessions, photoMap]);
 
   // ── Save status changes back into the session ─────────────────────────────
@@ -849,35 +902,52 @@ function App() {
       const next = status === null
         ? (()=>{const n={...prev};delete n[parcelId];return n;})()
         : {...prev,[parcelId]:status};
-      // Persist into session
       if (portalWeek) {
         setSessions(s => ({...s,[portalWeek]:{...s[portalWeek],statuses:next}}));
+        apiSetStatus(portalWeek, parcelId, status, getReviewerEmail());
       }
       return next;
     });
   }, [portalWeek]);
 
   // ── Save session when user clicks "Open Review Portal" ───────────────────
-  const saveAndOpenPortal = useCallback(() => {
-    const weekKey = activeWeek || currentWeekKey;
+  // IMPORTANT: uploads always land in the CURRENT week slot.
+  // Previous weeks are never touched -- each week is a separate isolated session.
+  const saveAndOpenPortal = useCallback(async () => {
+    const weekKey = currentWeekKey; // always current week, never overwrite past
     const now = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
-    const sess = {
-      mismatches,
-      perfects,
-      statuses: sessions[weekKey]?.statuses || {}, // preserve existing statuses if re-uploading same week
-      windowId,
-      createdAt: now,
-    };
+
+    // Warn if admin uploads while a different (past) week is active
+    if (activeWeek && activeWeek !== currentWeekKey) {
+      const ok = window.confirm(
+        "You are uploading new files while a previous week is open.\n\n" +
+        "This upload will be saved to the CURRENT week (" + weekKeyToLabel(currentWeekKey) + ").\n" +
+        "The previous week\'s review work will NOT be changed.\n\nContinue?"
+      );
+      if (!ok) return;
+    }
+
+    // Preserve any statuses already recorded this week (safe re-upload)
+    const existingStatuses = sessions[weekKey]?.statuses || {};
+
+    const sess = { mismatches, perfects, statuses: existingStatuses, windowId, createdAt: now };
     setSessions(s => ({...s,[weekKey]:sess}));
     setActiveWeek(weekKey);
-    openPortal(weekKey); // this sets statuses from sess, then opens
-    // directly set statuses from preserved statuses
-    setStatuses(sess.statuses);
+
+    // Pull authoritative statuses from Google Sheet
+    let sharedStatuses = existingStatuses;
+    if (SHARED_API_URL) {
+      const fromSheet = await apiGetStatuses(weekKey);
+      if (Object.keys(fromSheet).length > 0) sharedStatuses = fromSheet;
+    }
+
+    setStatuses(sharedStatuses);
+    setSessions(s => ({...s,[weekKey]:{...s[weekKey],statuses:sharedStatuses}}));
     setPortalWeek(weekKey);
     setPortalPhotos(photoMap);
     setView("portal");
     setPage(0);
-  }, [activeWeek, currentWeekKey, mismatches, perfects, sessions, windowId, photoMap, openPortal]);
+  }, [activeWeek, currentWeekKey, mismatches, perfects, sessions, windowId, photoMap]);
 
   // ── Start a new blank week ────────────────────────────────────────────────
   const startNewWeek = useCallback(() => {
