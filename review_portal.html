@@ -13,7 +13,7 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
   <!-- Babel standalone to transpile JSX in-browser -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -119,8 +119,8 @@ function normalizeRow(row, fileType) {
     return { ...base, type:"mismatch",
       fieldMls:   String(row["Field_MLS"]  || ""),
       fieldCama:  String(row["Field_CAMA"] || ""),
-      mlsValue:   row["MLS_Value"]  ?? "",
-      camaValue:  row["CAMA_Value"] ?? "",
+      mlsValue:   row["MLS_Value"]  || "",
+      camaValue:  row["CAMA_Value"] || "",
       difference: String(row["Difference"] || ""),
     };
   }
@@ -223,7 +223,7 @@ function EffectiveAgePanel({ yrblt, effyr, cdu, grade }) {
             <div key={duCode} style={{padding:"8px 6px",textAlign:"center",background:isCurrent?cfg.bg:"#fff",borderRight:i<5?"1px solid #e2e8f0":"none",position:"relative",outline:isCurrent?`2px solid ${cfg.border}`:"none",outlineOffset:-1,zIndex:isCurrent?1:0}}>
               <div style={{fontSize:10,fontWeight:700,fontFamily:"'DM Mono',monospace",color:isCurrent?cfg.color:"#94a3b8",letterSpacing:"0.06em",marginBottom:2}}>{duCode}</div>
               <div style={{fontSize:9,color:isCurrent?cfg.color:"#cbd5e1",fontFamily:"'DM Sans',sans-serif",marginBottom:4,opacity:0.8}}>{cfg.full}</div>
-              <div style={{fontSize:18,fontWeight:800,fontFamily:"'DM Mono',monospace",color:isCurrent?cfg.color:"#94a3b8",letterSpacing:"-0.01em"}}>{sugEff??"—"}</div>
+              <div style={{fontSize:18,fontWeight:800,fontFamily:"'DM Mono',monospace",color:isCurrent?cfg.color:"#94a3b8",letterSpacing:"-0.01em"}}>{(sugEff != null ? sugEff : "—")}</div>
               {isCurrent&&<div style={{marginTop:4,fontSize:8,fontWeight:700,fontFamily:"'DM Mono',monospace",color:cfg.color,letterSpacing:"0.05em",background:cfg.border+"33",borderRadius:3,padding:"1px 4px",display:"inline-block"}}>CURRENT</div>}
               {effChanged&&<div style={{marginTop:2,fontSize:8,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"#dc2626",letterSpacing:"0.04em"}}>⚠ was {effyr}</div>}
             </div>
@@ -700,8 +700,8 @@ function PhotoFolderUpload({ photoMap, onPhotosLoaded }) {
     const files = [];
     if (items) {
       for (const item of items) {
-        const entry = item.webkitGetAsEntry?.();
-        if (entry?.isDirectory) {
+        const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+        if (entry && entry.isDirectory) {
           // folder dropped — read entries
           const reader = entry.createReader();
           reader.readEntries(entries => {
@@ -839,7 +839,7 @@ function WeekSelectorPanel({ sessions, activeWeek, onSelect, onNewWeek }) {
         {sorted.map(key => {
           const s = sessions[key];
           const isActive = key === activeWeek;
-          const totalParcels = (s.mismatches?.length||0) + (s.perfects?.length||0) || (s.parcelCount||0);
+          const totalParcels = ((s.mismatches ? s.mismatches.length : 0)) + ((s.perfects ? s.perfects.length : 0)) || (s.parcelCount||0);
           const reviewed = Object.keys(s.statuses||{}).length;
           const pct = totalParcels > 0 ? Math.round(reviewed/totalParcels*100) : 0;
           return (
@@ -1067,14 +1067,14 @@ Continue?"
 
   // ── Portal data comes from the open session ───────────────────────────────
   const portalSession = portalWeek ? sessions[portalWeek] : null;
-  const portalMismatches = portalSession?.mismatches || [];
-  const portalPerfects   = portalSession?.perfects   || [];
+  const portalMismatches = (portalSession && portalSession.mismatches) || [];
+  const portalPerfects   = (portalSession && portalSession.perfects)   || [];
 
   const isPastWeek   = portalWeek && portalWeek !== currentWeekKey;
   const currentSess  = sessions[portalWeek] || {};
   const archiveEmpty = isPastWeek
-    && (currentSess.mismatches||[]).length === 0
-    && (currentSess.perfects||[]).length   === 0;
+    && ((currentSess.mismatches||[])).length === 0
+    && ((currentSess.perfects||[])).length   === 0;
 
   const allParcels = useMemo(() => {
     const map = new Map();
@@ -1123,11 +1123,11 @@ Continue?"
         YRBLT:p.yrblt, SFLA:p.sfla, FIXBATH:p.fixbath, FIXHALF:p.fixhalf,
         Current_EFFYR:p.effyr, GRADE:p.grade, CDU:p.cdu,
         Type:p.type==="mismatch"?"Mismatch":"Perfect",
-        Mismatches:p.mismatches?.length??0,
-        Suggested_EFFYR:suggestions[p.cdu]??"",
-        Sugg_EX:suggestions["EX"]??"", Sugg_VG:suggestions["VG"]??"",
-        Sugg_GD:suggestions["GD"]??"", Sugg_AV:suggestions["AV"]??"",
-        Sugg_FR:suggestions["FR"]??"", Sugg_PR:suggestions["PR"]??"",
+        Mismatches:(p.mismatches ? p.mismatches.length : 0),
+        Suggested_EFFYR:(suggestions[p.cdu] != null ? suggestions[p.cdu] : ""),
+        Sugg_EX:suggestions["EX"]||"", Sugg_VG:suggestions["VG"]||"",
+        Sugg_GD:suggestions["GD"]||"", Sugg_AV:suggestions["AV"]||"",
+        Sugg_FR:suggestions["FR"]||"", Sugg_PR:suggestions["PR"]||"",
         Status:statuses[p.parcelId]||"",
       };
     });
@@ -1277,7 +1277,7 @@ Continue?"
   );
 
   // ── PORTAL ────────────────────────────────────────────────────────────────
-  const portalWId = portalSession?.windowId || windowId;
+  const portalWId = (portalSession && portalSession.windowId) || windowId;
 
   return (
     <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"'DM Sans',sans-serif"}}>
