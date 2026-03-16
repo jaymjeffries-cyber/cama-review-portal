@@ -1073,8 +1073,8 @@ Continue?"
   const isPastWeek   = portalWeek && portalWeek !== currentWeekKey;
   const currentSess  = sessions[portalWeek] || {};
   const archiveEmpty = isPastWeek
-    && ((currentSess.mismatches||[])).length === 0
-    && ((currentSess.perfects||[])).length   === 0;
+    && (currentSess.mismatches||[]).length === 0
+    && (currentSess.perfects||[]).length   === 0;
 
   const allParcels = useMemo(() => {
     const map = new Map();
