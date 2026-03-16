@@ -886,6 +886,7 @@ function App() {
   const [portalWeek,   setPortalWeek]   = useState(null); // which week is open in portal
   const [statuses,     setStatuses]     = useState({});
   const [portalPhotos, setPortalPhotos] = useState(new Map());
+  const [portalParcelData, setPortalParcelData] = useState({ mismatches: [], perfects: [] });
   const [zoneFilter,   setZoneFilter]   = useState("All");
   const [cduFilter,    setCduFilter]    = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -931,6 +932,7 @@ function App() {
     setView("portal");
     setPage(0);
     setStatuses((sess && sess.statuses) || {});
+    setPortalParcelData({ mismatches: (sess && sess.mismatches) || [], perfects: (sess && sess.perfects) || [] });
     apiGetStatuses(weekKey).then(function(shared) {
       if (Object.keys(shared).length > 0) {
         setStatuses(shared);
@@ -945,6 +947,7 @@ function App() {
     if (!isCurrentWeek && !hasParcels) {
       loadArchive(weekKey).then(function(archive) {
         if (!archive) return;
+        setPortalParcelData({ mismatches: archive.mismatches || [], perfects: archive.perfects || [] });
         setSessions(function(s) {
           var u = Object.assign({}, s);
           u[weekKey] = Object.assign({}, u[weekKey], {
@@ -990,6 +993,7 @@ function App() {
     setSessions(function(s) { var u=Object.assign({},s); u[weekKey]=sess; return u; });
     setActiveWeek(weekKey);
     setStatuses(existingStatuses);
+    setPortalParcelData({ mismatches: mismatches, perfects: perfects });
     setPortalWeek(weekKey);
     setPortalPhotos(photoMap);
     setView("portal");
@@ -1021,8 +1025,8 @@ function App() {
 
   // -- Portal data comes from the open session -------------------------------
   const portalSession = portalWeek ? sessions[portalWeek] : null;
-  const portalMismatches = (portalSession && portalSession.mismatches) || [];
-  const portalPerfects   = (portalSession && portalSession.perfects)   || [];
+  const portalMismatches = portalParcelData.mismatches || [];
+  const portalPerfects   = portalParcelData.perfects   || [];
 
   var isPastWeek   = portalWeek && portalWeek !== currentWeekKey;
   var currentSess  = sessions[portalWeek] || {};
