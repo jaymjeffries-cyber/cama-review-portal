@@ -469,7 +469,7 @@ function PropertyCard({ parcel, status, onStatus, windowId, photoDataUrl, isPast
   const [showRemarks, setShowRemarks] = useState(false);
   const cfg = status ? STATUS_CONFIG[status] : null;
   const pastWeekBanner = isPastWeek ? (
-    <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#92400e",background:"#fef3c7",border:"1px solid #fcd34d",borderRadius:5,padding:"3px 8px",marginBottom:8,display:"inline-block"}}>\xf0\x9f\x93\x82 Past week — photos not available</div>
+    <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#92400e",background:"#fef3c7",border:"1px solid #fcd34d",borderRadius:5,padding:"3px 8px",marginBottom:8,display:"inline-block"}}>📂 Past week — photos not available</div>
   ) : null;
 
   const iasWorldUrl = windowId && parcel.parcelId
@@ -485,7 +485,7 @@ function PropertyCard({ parcel, status, onStatus, windowId, photoDataUrl, isPast
   return (
     <div>
     {pastWeekBanner}
-    <div style={{background:cfg?cfg.bg":"#ffffff",border:`1.5px solid ${cfg?cfg.border:"#e5e7eb"}`,borderRadius:14,padding:"20px 22px",transition:"border-color 0.2s,background 0.2s,box-shadow 0.15s",boxShadow:status?`0 2px 8px ${cfg.border}33`:"0 1px 3px #0001"}}>
+    <div style={{background:cfg?cfg.bg+"55":"#ffffff",border:`1.5px solid ${cfg?cfg.border:"#e5e7eb"}`,borderRadius:14,padding:"20px 22px",transition:"border-color 0.2s,background 0.2s,box-shadow 0.15s",boxShadow:status?`0 2px 8px ${cfg.border}33`:"0 1px 3px #0001"}}>
 
       {/* ── Top section: photo + info ── */}
       <div style={{display:"flex",gap:12,marginBottom:8}}>
@@ -736,9 +736,7 @@ function PhotoFolderUpload({ photoMap, onPhotosLoaded }) {
 }
 
 // ─── Shared Backend Configuration ────────────────────────────────────────────────
-const SHARED_API_URL = (typeof window !== "undefined" && window.INJECTED_SHARED_API_URL)
-  ? window.INJECTED_SHARED_API_URL
-  : "https://script.google.com/macros/s/AKfycbxv8Y30ThaDcxzCymkMxtMm3gTsmAnisF0yhZDI2au2VUNYc9Ypwkevat03tI1KimeP4w/exec";
+const SHARED_API_URL = "https://script.google.com/macros/s/AKfycbxv8Y30ThaDcxzCymkMxtMm3gTsmAnisF0yhZDI2au2VUNYc9Ypwkevat03tI1KimeP4w/exec";
 
 function getReviewerEmail() {
   let email = sessionStorage.getItem("sc_reviewer_email");
