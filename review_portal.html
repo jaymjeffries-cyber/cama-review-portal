@@ -346,6 +346,175 @@ Respond ONLY with valid JSON — no markdown, no extra text:
   "conditionConfidence": "Low|Moderate|High",
   "rationale": "2–3 sentences. Cite the specific evidence used, flag any realtor bias detected, and note any photo vs. remarks conflict."
 }`
+
+    try {
+      const contentBlocks = [];
+
+      // Add photo first if available
+      if (hasPhoto) {
+        const base64 = photoDataUrl.split(",")[1];
+        const mimeMatch = photoDataUrl.match(/data:([^;]+);/);
+        const mediaType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+        contentBlocks.push({
+          type: "image",
+          source: { type:"base64", media_type: mediaType, data: base64 }
+        });
+      }
+
+      contentBlocks.push({ type:"text", text: textPrompt });
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type":"application/json", ...(sharedApiKey ? {"x-api-key": sharedApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true"} : {}) },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role:"user", content: contentBlocks }],
+        }),
+      });
+
+      const data = await response.json();
+      const raw = (data.content || []).map(b => b.text||"").join("").trim();
+      const clean = raw.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
+      setResult(parsed);
+      setState("result");
+    } catch(err) {
+      setErrorMsg("Could not get suggestion. Check API access and try again.");
+      setState("error");
+    }
+  }, [parcel, photoDataUrl]);
+
+  const confidenceColor = (c) => c==="High" ? "#15803d" : c==="Moderate" ? "#b45309" : "#6b7280";
+
+  // Grade chip color - map grade letter to rough tier
+  const gradeChipColor = (g) => {
+    if (!g) return { bg:"#f1f5f9", color:"#475569", border:"#cbd5e1" };
+    const letter = g[0].toUpperCase();
+    if (letter==="X") return { bg:"#faf5ff", color:"#7e22ce", border:"#d8b4fe" };
+    if (letter==="A") return { bg:"#f0fdf4", color:"#166534", border:"#86efac" };
+    if (letter==="B") return { bg:"#eff6ff", color:"#1e40af", border:"#93c5fd" };
+    if (letter==="C") return { bg:"#fefce8", color:"#854d0e", border:"#fde047" };
+    if (letter==="D") return { bg:"#fff7ed", color:"#9a3412", border:"#fdba74" };
+    return               { bg:"#fef2f2", color:"#7f1d1d", border:"#fca5a5" };
+  };
+
+  const condChipColor = (n) => {
+    if (n<=1) return { bg:"#dcfce7", color:"#166534", border:"#86efac" };
+    if (n===2) return { bg:"#dbeafe", color:"#1e40af", border:"#93c5fd" };
+    if (n===3) return { bg:"#fef9c3", color:"#854d0e", border:"#fde047" };
+    if (n===4) return { bg:"#fed7aa", color:"#9a3412", border:"#fb923c" };
+    return             { bg:"#fee2e2", color:"#7f1d1d", border:"#fca5a5" };
+  };
+
+  return (
+    <div style={{margin:"8px 0",background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:10,overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 12px",background:"linear-gradient(90deg,#1e293b,#1e3a5f)",borderBottom:"1px solid #e2e8f0"}}>
+        <div style={{display:"flex",alignItems:"center",gap:7}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#7dd3fc",fontFamily:"'DM Mono',monospace",letterSpacing:"0.06em"}}>AI GRADE &amp; CONDITION</span>
+          {hasPhoto && <span style={{fontSize:9,background:"#0ea5e922",border:"1px solid #0ea5e966",color:"#38bdf8",borderRadius:4,padding:"1px 6px",fontFamily:"'DM Mono',monospace",fontWeight:700}}> PHOTO</span>}
+        </div>
+        {state !== "loading" && (
+          <button onClick={sharedApiKey ? runSuggestion : null}
+            title={sharedApiKey ? "" : "Set API key first - click  bottom-right"}
+            style={{fontSize:11,fontWeight:700,fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em",cursor:sharedApiKey?"pointer":"not-allowed",background:sharedApiKey?"#2563eb":"#334155",color:sharedApiKey?"#fff":"#64748b",border:"none",borderRadius:6,padding:"4px 12px",transition:"background 0.15s"}}
+            onMouseEnter={e=>{if(sharedApiKey)e.currentTarget.style.background="#1d4ed8";}}
+            onMouseLeave={e=>{if(sharedApiKey)e.currentTarget.style.background="#2563eb";}}
+          >
+            {state==="result" ? "Re-run Re-run" : " Suggest"}
+          </button>
+        )}
+        {state === "loading" && (
+          <span style={{fontSize:11,color:"#94a3b8",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:6}}>
+            <span style={{display:"inline-block",width:10,height:10,border:"2px solid #3b82f6",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.7s linear infinite"}} />
+            Analyzing...
+          </span>
+        )}
+      </div>
+
+      {/* Idle state */}
+      {state==="idle" && (
+        sharedApiKey ? (
+          <div style={{padding:"10px 12px",fontSize:11,color:"#94a3b8",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>
+            Click  Suggest to get an AI-assisted Grade &amp; Condition recommendation
+          </div>
+        ) : (
+          <div style={{padding:"10px 12px",display:"flex",alignItems:"center",gap:10,background:"#1e1a0e",borderTop:"1px solid #78350f44"}}>
+            <span style={{fontSize:16}}></span>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"#fbbf24",fontFamily:"'DM Mono',monospace",marginBottom:2}}>API KEY NOT SET</div>
+              <div style={{fontSize:10,color:"#92400e",fontFamily:"'DM Sans',sans-serif",lineHeight:1.5}}>
+                Click the <strong style={{color:"#fbbf24"}}> button</strong> in the bottom-right corner of the page, paste the Anthropic API key, then click Save. AI suggestions will work for the rest of your session.
+              </div>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* Error */}
+      {state==="error" && (
+        <div style={{padding:"10px 12px"}}>
+          <div style={{fontSize:11,color:"#dc2626",fontFamily:"'DM Mono',monospace",marginBottom:6}}>{errorMsg}</div>
+          {!sharedApiKey && (
+            <div style={{fontSize:10,color:"#92400e",fontFamily:"'DM Sans',sans-serif",background:"#1e1a0e",border:"1px solid #78350f44",borderRadius:6,padding:"6px 10px",lineHeight:1.5}}>
+               Most likely cause: API key not set. Click  bottom-right   paste key   Save.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Result */}
+      {state==="result" && result && (() => {
+        const gc = gradeChipColor(result.suggestedGrade);
+        const cc = condChipColor(result.suggestedCondition);
+        return (
+          <div style={{padding:"10px 12px"}}>
+            {/* Grade + Condition chips */}
+            <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:gc.bg,border:`1.5px solid ${gc.border}`,borderRadius:8,padding:"6px 14px",minWidth:70}}>
+                <span style={{fontSize:9,fontWeight:700,color:gc.color,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",marginBottom:2}}>GRADE</span>
+                <span style={{fontSize:28,fontWeight:800,color:gc.color,fontFamily:"'DM Mono',monospace",lineHeight:1}}>{result.suggestedGrade}</span>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",background:cc.bg,border:`1.5px solid ${cc.border}`,borderRadius:8,padding:"6px 14px",minWidth:70}}>
+                <span style={{fontSize:9,fontWeight:700,color:cc.color,fontFamily:"'DM Mono',monospace",letterSpacing:"0.08em",marginBottom:2}}>CONDITION</span>
+                <span style={{fontSize:28,fontWeight:800,color:cc.color,fontFamily:"'DM Mono',monospace",lineHeight:1}}>{result.suggestedCondition}</span>
+                <span style={{fontSize:9,color:cc.color,fontFamily:"'DM Sans',sans-serif",marginTop:1}}>{result.conditionLabel}</span>
+              </div>
+              {/* Compare to current */}
+              {(parcel.grade || parcel.cdu) && (
+                <div style={{flex:1,minWidth:120,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"6px 10px"}}>
+                  <div style={{fontSize:9,fontWeight:700,color:"#64748b",fontFamily:"'DM Mono',monospace",letterSpacing:"0.06em",marginBottom:4}}>CURRENT CAMA</div>
+                  <div style={{display:"flex",gap:10}}>
+                    {parcel.grade && <span style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:"#374151"}}>Grade: <strong>{parcel.grade}</strong></span>}
+                    {parcel.cdu && <span style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:"#374151"}}>CDU: <strong>{parcel.cdu}</strong></span>}
+                  </div>
+                </div>
+              )}
+              {/* Confidence */}
+              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:"#64748b"}}>
+                  Grade conf: <strong style={{color:confidenceColor(result.gradeConfidence)}}>{result.gradeConfidence}</strong>
+                </div>
+                <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:"#64748b"}}>
+                  Cond conf: <strong style={{color:confidenceColor(result.conditionConfidence)}}>{result.conditionConfidence}</strong>
+                </div>
+              </div>
+            </div>
+            {/* Rationale */}
+            <div style={{fontSize:14,color:"#374151",fontFamily:"'DM Sans',sans-serif",lineHeight:1.7,background:"#fff",border:"1px solid #e2e8f0",borderRadius:7,padding:"10px 14px"}}>
+              {result.rationale}
+            </div>
+            <div style={{fontSize:9,color:"#9ca3af",fontFamily:"'DM Mono',monospace",marginTop:5}}>
+              (!) AI suggestion only - field inspection required for final determination
+            </div>
+          </div>
+        );
+      })()}
+
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
 }
 
 function PropertyCard({ parcel, status, onStatus, windowId, photoDataUrl, isPastWeek }) {
