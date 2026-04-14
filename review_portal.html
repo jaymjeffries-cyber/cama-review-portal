@@ -886,7 +886,8 @@ function WeekSelectorPanel({ sessions, activeWeek, onSelect, onNewWeek }) {
         {sorted.map(key => {
           const s = sessions[key];
           const isActive = key === activeWeek;
-          const totalParcels = (s.mismatches?.length||0) + (s.perfects?.length||0);
+          // Use authoritative totalParcels from archive if available, otherwise fall back to counting arrays
+          const totalParcels = s.totalParcels || (((s.mismatches ? s.mismatches.length : 0) + (s.perfects ? s.perfects.length : 0)) || (s.parcelCount||0));
           const reviewed = Object.keys(s.statuses||{}).length;
           const pct = totalParcels > 0 ? Math.round(reviewed/totalParcels*100) : 0;
           return (
@@ -897,7 +898,7 @@ function WeekSelectorPanel({ sessions, activeWeek, onSelect, onNewWeek }) {
               <div>
                 <div style={{fontSize:12,fontWeight:700,color:isActive?"#38bdf8":"#e2e8f0",fontFamily:"'DM Mono',monospace"}}>{weekKeyToLabel(key)}</div>
                 <div style={{fontSize:10,color:"#64748b",fontFamily:"'DM Mono',monospace",marginTop:2}}>
-                  {totalParcels} parcels · {s.createdAt}
+                  {totalParcels > 0 ? totalParcels : "?"} parcels  {s.createdAt}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -922,23 +923,24 @@ function WeekSelectorPanel({ sessions, activeWeek, onSelect, onNewWeek }) {
   );
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
+// --- Main App -----------------------------------------------------------------
 function App() {
-  // ── Week sessions stored in memory ──────────────────────────────────────────
+  // -- Week sessions stored in memory ------------------------------------------
   // sessions: { [weekKey]: { label, mismatches, perfects, statuses, windowId, createdAt } }
   const [sessions,     setSessions]     = useState({});
   const [activeWeek,   setActiveWeek]   = useState(null); // weekKey of session being uploaded to
 
-  // ── Current upload state (before saving into a session) ───────────────────
+  // -- Current upload state (before saving into a session) -------------------
   const [mismatches,   setMismatches]   = useState([]);
   const [perfects,     setPerfects]     = useState([]);
   const [photoMap,     setPhotoMap]     = useState(new Map());
   const [windowId,     setWindowId]     = useState("638981240146803746");
 
-  // ── Portal view state ─────────────────────────────────────────────────────
+  // -- Portal view state -----------------------------------------------------
   const [portalWeek,   setPortalWeek]   = useState(null); // which week is open in portal
   const [statuses,     setStatuses]     = useState({});
   const [portalPhotos, setPortalPhotos] = useState(new Map());
+  const [portalParcelData, setPortalParcelData] = useState({ mismatches: [], perfects: [] });
   const [zoneFilter,   setZoneFilter]   = useState("All");
   const [cduFilter,    setCduFilter]    = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -948,57 +950,130 @@ function App() {
   const [view,         setView]         = useState("home");
   const PAGE_SIZE = 15;
 
-  // ── Derive current week key ───────────────────────────────────────────────
+  // -- Derive current week key -----------------------------------------------
   const currentWeekKey = useMemo(() => getISOWeekKey(), []);
 
-  // ── When user opens portal for a week, load that session's statuses ───────
-  const openPortal = useCallback((weekKey) => {
-    const sess = sessions[weekKey];
-    if (!sess) return;
+  useEffect(function() {
+    apiGetAllWeeks().then(function(weeks) {
+      if (!weeks || !Object.keys(weeks).length) return;
+      setSessions(function(prev) {
+        var merged = Object.assign({}, prev);
+        Object.entries(weeks).forEach(function(entry) {
+          var wk = entry[0], summary = entry[1];
+          if (!merged[wk]) {
+            merged[wk] = {
+              mismatches: [], perfects: [], statuses: {},
+              windowId: "638981240146803746",
+              createdAt: weekKeyToLabel(wk),
+              parcelCount: summary.total || 0,
+              needsUpload: true
+            };
+          } else {
+            // Never overwrite parcels already loaded from archive
+            merged[wk].parcelCount = merged[wk].parcelCount || summary.total || 0;
+            // Merge statuses without touching parcel data
+          }
+        });
+        return merged;
+      });
+    });
+  }, []);
+
+  // -- When user opens portal for a week, load that session's statuses -------
+  const openPortal = useCallback(function(weekKey) {
+    var sess = sessions[weekKey];
+    var isCurrentWeek = weekKey === currentWeekKey;
     setPortalWeek(weekKey);
-    setStatuses(sess.statuses || {});
-    setPortalPhotos(photoMap); // photos stay in memory from upload step
+    setPortalPhotos(isCurrentWeek ? photoMap : new Map());
     setView("portal");
     setPage(0);
-  }, [sessions, photoMap]);
+    setStatuses((sess && sess.statuses) || {});
+    // For past weeks, don't set empty parcel data - wait for archive to load
+    if (isCurrentWeek) {
+      setPortalParcelData({ mismatches: (sess && sess.mismatches) || [], perfects: (sess && sess.perfects) || [] });
+    }
+    apiGetStatuses(weekKey).then(function(shared) {
+      if (Object.keys(shared).length > 0) {
+        setStatuses(shared);
+        setSessions(function(s) {
+          var u = Object.assign({}, s);
+          u[weekKey] = Object.assign({}, u[weekKey], { statuses: shared });
+          return u;
+        });
+      }
+    });
+    var hasParcels = sess && ((sess.mismatches||[]).length + (sess.perfects||[]).length) > 0;
+    if (!isCurrentWeek && !hasParcels) {
+      loadArchive(weekKey).then(function(archive) {
+        if (!archive) return;
+        var normMM = (archive.mismatches || []).map(function(r){ return normalizeRow(r,"mismatch"); });
+        var normPP = (archive.perfects   || []).map(function(r){ return normalizeRow(r,"perfect"); });
+        setPortalParcelData({ mismatches: normMM, perfects: normPP });
+        setSessions(function(s) {
+          var u = Object.assign({}, s);
+          u[weekKey] = Object.assign({}, u[weekKey], {
+            mismatches: archive.mismatches || [],
+            perfects:   archive.perfects   || [],
+            totalParcels: archive.totalParcels || null,  // Authoritative count from archive
+            needsUpload: false
+          });
+          return u;
+        });
+      });
+    }
+  }, [sessions, photoMap, currentWeekKey]);
 
-  // ── Save status changes back into the session ─────────────────────────────
-  const setStatus = useCallback((parcelId, status) => {
-    setStatuses(prev => {
-      const next = status === null
-        ? (()=>{const n={...prev};delete n[parcelId];return n;})()
-        : {...prev,[parcelId]:status};
-      // Persist into session
+  // -- Save status changes back into the session -----------------------------
+  const setStatus = useCallback(function(parcelId, status) {
+    var reviewer = getReviewerEmail();
+    setStatuses(function(prev) {
+      var next = Object.assign({}, prev);
+      if (status === null) { delete next[parcelId]; }
+      else { next[parcelId] = status; }
       if (portalWeek) {
-        setSessions(s => ({...s,[portalWeek]:{...s[portalWeek],statuses:next}}));
+        setSessions(function(s) {
+          var u = Object.assign({}, s);
+          u[portalWeek] = Object.assign({}, u[portalWeek], { statuses: next });
+          return u;
+        });
+        apiSetStatus(portalWeek, parcelId, status, reviewer);
       }
       return next;
     });
   }, [portalWeek]);
 
-  // ── Save session when user clicks "Open Review Portal" ───────────────────
-  const saveAndOpenPortal = useCallback(() => {
-    const weekKey = activeWeek || currentWeekKey;
-    const now = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
-    const sess = {
-      mismatches,
-      perfects,
-      statuses: sessions[weekKey]?.statuses || {}, // preserve existing statuses if re-uploading same week
-      windowId,
-      createdAt: now,
+  // -- Save session when user clicks "Open Review Portal" -------------------
+  const saveAndOpenPortal = useCallback(function() {
+    var weekKey = currentWeekKey;
+    var now = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+    var existingStatuses = (sessions[weekKey] && sessions[weekKey].statuses) || {};
+    var sess = {
+      mismatches: mismatches, perfects: perfects,
+      statuses: existingStatuses, windowId: windowId,
+      createdAt: now, parcelCount: mismatches.length + perfects.length,
+      totalParcels: mismatches.length + perfects.length,  // Authoritative count for current week
+      needsUpload: false
     };
-    setSessions(s => ({...s,[weekKey]:sess}));
+    setSessions(function(s) { var u=Object.assign({},s); u[weekKey]=sess; return u; });
     setActiveWeek(weekKey);
-    openPortal(weekKey); // this sets statuses from sess, then opens
-    // directly set statuses from preserved statuses
-    setStatuses(sess.statuses);
+    setStatuses(existingStatuses);
+    setPortalParcelData({ mismatches: mismatches, perfects: perfects });
     setPortalWeek(weekKey);
     setPortalPhotos(photoMap);
     setView("portal");
     setPage(0);
-  }, [activeWeek, currentWeekKey, mismatches, perfects, sessions, windowId, photoMap, openPortal]);
-
-  // ── Start a new blank week ────────────────────────────────────────────────
+    apiGetStatuses(weekKey).then(function(shared) {
+      if (Object.keys(shared).length > 0) {
+        setStatuses(shared);
+        setSessions(function(s) {
+          var u=Object.assign({},s);
+          u[weekKey]=Object.assign({},u[weekKey],{statuses:shared});
+          return u;
+        });
+      }
+    });
+  }, [currentWeekKey, mismatches, perfects, sessions, windowId, photoMap]);
+  // -- Start a new blank week ------------------------------------------------
   const startNewWeek = useCallback(() => {
     setMismatches([]);
     setPerfects([]);
@@ -1012,10 +1087,16 @@ function App() {
     reader.readAsArrayBuffer(file);
   }, []);
 
-  // ── Portal data comes from the open session ───────────────────────────────
+  // -- Portal data comes from the open session -------------------------------
   const portalSession = portalWeek ? sessions[portalWeek] : null;
-  const portalMismatches = portalSession?.mismatches || [];
-  const portalPerfects   = portalSession?.perfects   || [];
+  const portalMismatches = portalParcelData.mismatches || [];
+  const portalPerfects   = portalParcelData.perfects   || [];
+
+  var isPastWeek   = portalWeek && portalWeek !== currentWeekKey;
+  var currentSess  = sessions[portalWeek] || {};
+  var archiveEmpty = isPastWeek
+    && (currentSess.mismatches||[]).length === 0
+    && (currentSess.perfects||[]).length   === 0;
 
   const allParcels = useMemo(() => {
     const map = new Map();
@@ -1064,11 +1145,11 @@ function App() {
         YRBLT:p.yrblt, SFLA:p.sfla, FIXBATH:p.fixbath, FIXHALF:p.fixhalf,
         Current_EFFYR:p.effyr, GRADE:p.grade, CDU:p.cdu,
         Type:p.type==="mismatch"?"Mismatch":"Perfect",
-        Mismatches:p.mismatches?.length??0,
-        Suggested_EFFYR:suggestions[p.cdu]??"",
-        Sugg_EX:suggestions["EX"]??"", Sugg_VG:suggestions["VG"]??"",
-        Sugg_GD:suggestions["GD"]??"", Sugg_AV:suggestions["AV"]??"",
-        Sugg_FR:suggestions["FR"]??"", Sugg_PR:suggestions["PR"]??"",
+        Mismatches:(p.mismatches ? p.mismatches.length : 0),
+        Suggested_EFFYR:(suggestions[p.cdu] != null ? suggestions[p.cdu] : ""),
+        Sugg_EX:suggestions["EX"]||"", Sugg_VG:suggestions["VG"]||"",
+        Sugg_GD:suggestions["GD"]||"", Sugg_AV:suggestions["AV"]||"",
+        Sugg_FR:suggestions["FR"]||"", Sugg_PR:suggestions["PR"]||"",
         Status:statuses[p.parcelId]||"",
       };
     });
@@ -1084,11 +1165,11 @@ function App() {
     flagged:    Object.values(statuses).filter(s=>s==="Flagged").length,
   }),[allParcels,statuses]);
 
-  // ── Read API key status from context ────────────────────────────────────
+  // -- Read API key status from context ------------------------------------
   const currentApiKey = React.useContext(ApiKeyContext);
   const apiKeyReady = !!currentApiKey && currentApiKey.trim().length > 0;
 
-  // ── Auto-load PRELOADED_DATA on mount ────────────────────────────────────
+  // -- Auto-load PRELOADED_DATA on mount ------------------------------------
   useEffect(() => {
     if (!PRELOADED) return;
     const mm = groupByParcel((PRELOADED.mismatchRows||[]).map(r=>normalizeRow(r,"mismatches")));
@@ -1101,13 +1182,13 @@ function App() {
     }
   }, []);
 
-  // ── HOME ──────────────────────────────────────────────────────────────────
+  // -- HOME ------------------------------------------------------------------
   if (view==="home") return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%)",fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 20px"}}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;600;700&family=Syne:wght@700;800&display=swap');*{box-sizing:border-box;}`}</style>
 
       <div style={{textAlign:"center",marginBottom:28}}>
-        <div style={{fontSize:12,letterSpacing:"0.2em",color:"#7dd3fc",fontFamily:"'DM Mono',monospace",marginBottom:12,textTransform:"uppercase"}}>STARK COUNTY AUDITOR'S OFFICE · PROPERTY ASSESSMENT</div>
+        <div style={{fontSize:12,letterSpacing:"0.2em",color:"#7dd3fc",fontFamily:"'DM Mono',monospace",marginBottom:12,textTransform:"uppercase"}}>STARK COUNTY AUDITOR'S OFFICE  PROPERTY ASSESSMENT</div>
         <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:"clamp(28px,5vw,44px)",color:"#f8fafc",fontWeight:800,margin:0,letterSpacing:"-0.02em",lineHeight:1.1}}>
           MLS / CAMA<br/><span style={{color:"#38bdf8"}}>Staff Review Portal</span>
         </h1>
@@ -1128,10 +1209,10 @@ function App() {
         <div style={{width:"100%",maxWidth:600,marginBottom:10,background:"#052e16",border:"1px solid #166534",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div style={{fontSize:11,color:"#4ade80",fontFamily:"'DM Mono',monospace",fontWeight:700,letterSpacing:"0.06em",marginBottom:2}}>
-              ✓ DATA PRE-LOADED BY ADMIN
+               DATA PRE-LOADED BY ADMIN
             </div>
             <div style={{fontSize:10,color:"#166534",fontFamily:"'DM Mono',monospace"}}>
-              {PRELOADED.weekLabel} · Generated {PRELOADED.generatedAt}
+              {PRELOADED.weekLabel}  Generated {PRELOADED.generatedAt}
             </div>
           </div>
           <div style={{fontSize:10,color:"#4ade80",fontFamily:"'DM Mono',monospace",textAlign:"right"}}>
@@ -1145,7 +1226,7 @@ function App() {
             <span style={{background:"#2563eb",color:"#fff",borderRadius:4,padding:"1px 7px",fontWeight:700}}>NEW</span>
             {weekKeyToLabel(activeWeek || currentWeekKey).toUpperCase()}
             {activeWeek && sessions[activeWeek] && (
-              <span style={{color:"#fbbf24",fontSize:10}}>⚠ Re-uploading will keep existing review statuses</span>
+              <span style={{color:"#fbbf24",fontSize:10}}>(!) Re-uploading will keep existing review statuses</span>
             )}
           </div>
         </div>
@@ -1159,10 +1240,10 @@ function App() {
         </div>
         <input value={windowId} onChange={e=>setWindowId(e.target.value)} placeholder="e.g. 638981240146803746"
           style={{width:"100%",padding:"7px 10px",borderRadius:7,border:"1px solid #334155",background:"#0f172a",color:"#f8fafc",fontFamily:"'DM Mono',monospace",fontSize:12,outline:"none"}}/>
-        <div style={{fontSize:10,color:"#475569",marginTop:4}}>Paste your windowId above — click ❓ for instructions</div>
+        <div style={{fontSize:10,color:"#475569",marginTop:4}}>Paste your windowId above - click  for instructions</div>
       </div>
 
-      {/* Uploads: 3 columns — hidden when pre-loaded data is present */}
+      {/* Uploads: 3 columns - hidden when pre-loaded data is present */}
       {!PRELOADED && <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,width:"100%",maxWidth:600,marginBottom:20}}>
         {[["STEP 1","VALUE MISMATCHES","mismatches",setMismatches,mismatches.length],
           ["STEP 2","PERFECT MATCHES","perfect",setPerfects,perfects.length]].map(([step,label,type,setter,count])=>(
@@ -1188,37 +1269,37 @@ function App() {
         </div>
       )}
 
-      {/* API Key warning — shown when data is loaded but no key set */}
+      {/* API Key warning - shown when data is loaded but no key set */}
       {allParcelsHome.length > 0 && !apiKeyReady && (
         <div style={{width:"100%",maxWidth:600,marginBottom:14,background:"#1c1208",border:"2px solid #d97706",borderRadius:12,padding:"14px 18px",display:"flex",alignItems:"flex-start",gap:12}}>
-          <span style={{fontSize:24,flexShrink:0}}>🔑</span>
+          <span style={{fontSize:24,flexShrink:0}}></span>
           <div>
             <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",fontFamily:"'DM Mono',monospace",letterSpacing:"0.06em",marginBottom:4}}>
               SET API KEY BEFORE ENTERING PORTAL
             </div>
             <div style={{fontSize:12,color:"#92400e",fontFamily:"'DM Sans',sans-serif",lineHeight:1.6}}>
               AI Grade &amp; Condition suggestions will <strong style={{color:"#fbbf24"}}>not work</strong> once inside the portal unless you set the key here first.<br/>
-              Click the <strong style={{color:"#fbbf24"}}>⚙️ button</strong> in the bottom-right corner → paste your Anthropic API key → click Save Key.
+              Click the <strong style={{color:"#fbbf24"}}> button</strong> in the bottom-right corner   paste your Anthropic API key   click Save Key.
             </div>
           </div>
         </div>
       )}
       {allParcelsHome.length > 0 && apiKeyReady && (
         <div style={{width:"100%",maxWidth:600,marginBottom:14,background:"#052e16",border:"1px solid #166534",borderRadius:10,padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:18}}>🔑</span>
-          <span style={{fontSize:12,color:"#4ade80",fontFamily:"'DM Mono',monospace",fontWeight:700}}>✓ API KEY SET — AI suggestions ready</span>
+          <span style={{fontSize:18}}></span>
+          <span style={{fontSize:12,color:"#4ade80",fontFamily:"'DM Mono',monospace",fontWeight:700}}> API KEY SET - AI suggestions ready</span>
         </div>
       )}
 
       <button disabled={allParcelsHome.length===0} onClick={saveAndOpenPortal}
         style={{background:allParcelsHome.length>0?"linear-gradient(135deg,#2563eb,#0ea5e9)":"#334155",color:allParcelsHome.length>0?"#fff":"#64748b",border:"none",borderRadius:12,padding:"14px 40px",fontSize:15,fontWeight:700,cursor:allParcelsHome.length>0?"pointer":"not-allowed",fontFamily:"'Syne',sans-serif",letterSpacing:"0.04em",boxShadow:allParcelsHome.length>0?"0 4px 20px #2563eb55":"none",transition:"all 0.2s"}}>
-        {allParcelsHome.length>0?"Open Review Portal →":"Upload files to continue"}
+        {allParcelsHome.length>0?"Open Review Portal  ":"Upload files to continue"}
       </button>
     </div>
   );
 
-  // ── PORTAL ────────────────────────────────────────────────────────────────
-  const portalWId = portalSession?.windowId || windowId;
+  // -- PORTAL ----------------------------------------------------------------
+  const portalWId = (portalSession && portalSession.windowId) || windowId;
 
   return (
     <div style={{minHeight:"100vh",background:"#f1f5f9",fontFamily:"'DM Sans',sans-serif"}}>
@@ -1227,7 +1308,7 @@ function App() {
       {/* Top bar */}
       <div style={{background:"#0f172a",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:100,borderBottom:"1px solid #1e293b"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-          <button onClick={()=>setView("home")} style={{background:"none",border:"none",color:"#7dd3fc",cursor:"pointer",fontSize:13,fontFamily:"'DM Mono',monospace",padding:"4px 8px",borderRadius:6,flexShrink:0}}>← Back</button>
+          <button onClick={()=>setView("home")} style={{background:"none",border:"none",color:"#7dd3fc",cursor:"pointer",fontSize:13,fontFamily:"'DM Mono',monospace",padding:"4px 8px",borderRadius:6,flexShrink:0}}> Back Back</button>
           <span style={{fontFamily:"'Syne',sans-serif",color:"#f8fafc",fontSize:14,fontWeight:800,letterSpacing:"-0.01em",whiteSpace:"nowrap"}}>MLS/CAMA Review</span>
           {/* Week switcher */}
           {Object.keys(sessions).length > 1 && (
@@ -1241,7 +1322,7 @@ function App() {
           {Object.keys(sessions).length === 1 && portalWeek && (
             <span style={{fontSize:11,color:"#38bdf8",fontFamily:"'DM Mono',monospace",background:"#1e293b",border:"1px solid #334155",borderRadius:6,padding:"3px 8px"}}>{weekKeyToLabel(portalWeek)}</span>
           )}
-          {portalPhotos.size>0&&<span style={{fontSize:10,background:"#7c3aed22",border:"1px solid #7c3aed66",color:"#a78bfa",borderRadius:4,padding:"2px 6px",fontFamily:"'DM Mono',monospace",fontWeight:700,flexShrink:0}}>🖼 {portalPhotos.size}</span>}
+          {portalPhotos.size>0&&<span style={{fontSize:10,background:"#7c3aed22",border:"1px solid #7c3aed66",color:"#a78bfa",borderRadius:4,padding:"2px 6px",fontFamily:"'DM Mono',monospace",fontWeight:700,flexShrink:0}}> {portalPhotos.size}</span>}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
           {[["UNR",counts.unreviewed,"#94a3b8","Unreviewed"],["REV",counts.reviewed,"#4ade80","Reviewed"],["FLD",counts.fieldVisit,"#60a5fa","Field Visit"],["FLG",counts.flagged,"#fbbf24","Flagged"]].map(([abbr,val,color,title])=>(
@@ -1250,7 +1331,7 @@ function App() {
               <span style={{fontSize:9,color:"#475569"}}>{abbr}</span>
             </div>
           ))}
-          <button onClick={exportXlsx} style={{marginLeft:4,background:"#1e293b",border:"1px solid #334155",color:"#7dd3fc",borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em"}}>↓ Export</button>
+          <button onClick={exportXlsx} style={{marginLeft:4,background:"#1e293b",border:"1px solid #334155",color:"#7dd3fc",borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em"}}> Export</button>
         </div>
       </div>
 
@@ -1260,16 +1341,16 @@ function App() {
           style={{padding:"6px 12px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:12,fontFamily:"'DM Mono',monospace",outline:"none",width:220,background:"#fafafa"}}/>
         <select value={zoneFilter} onChange={e=>{setZoneFilter(e.target.value);setPage(0);}}
           style={{padding:"6px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:12,fontFamily:"'DM Mono',monospace",background:"#fafafa",cursor:"pointer",outline:"none"}}>
-          {zones.map(z=><option key={z} value={z}>{z==="All"?"All Zones":`📍 ${z}`}</option>)}
+          {zones.map(z=><option key={z} value={z}>{z==="All"?"All Zones":` ${z}`}</option>)}
         </select>
         <select value={cduFilter} onChange={e=>{setCduFilter(e.target.value);setPage(0);}}
           style={{padding:"6px 10px",borderRadius:8,border:"1.5px solid #d1d5db",fontSize:12,fontFamily:"'DM Mono',monospace",background:"#fafafa",cursor:"pointer",outline:"none"}}>
           <option value="All">All CDU</option>
-          {CDU_ORDER.map(c=><option key={c} value={c}>{c} — {CDU_CONFIG[c].full}</option>)}
+          {CDU_ORDER.map(c=><option key={c} value={c}>{c} - {CDU_CONFIG[c].full}</option>)}
         </select>
         {["All","Mismatches","Perfect"].map(t=>(
           <button key={t} onClick={()=>{setTypeFilter(t);setPage(0);}} style={{padding:"5px 12px",borderRadius:8,fontSize:11,fontWeight:700,fontFamily:"'DM Mono',monospace",cursor:"pointer",border:"1.5px solid",borderColor:typeFilter===t?"#2563eb":"#d1d5db",background:typeFilter===t?"#dbeafe":"#fafafa",color:typeFilter===t?"#1d4ed8":"#6b7280",transition:"all 0.15s"}}>
-            {t==="Mismatches"?"⚠ Mismatches":t==="Perfect"?"✓ Perfect":"All Types"}
+            {t==="Mismatches"?"(!) Mismatches":t==="Perfect"?" Perfect":"All Types"}
           </button>
         ))}
         <select value={statusFilter} onChange={e=>{setStatusFilter(e.target.value);setPage(0);}}
@@ -1277,34 +1358,40 @@ function App() {
           {["All","Unreviewed",...STATUSES].map(s=><option key={s}>{s}</option>)}
         </select>
         <span style={{marginLeft:"auto",fontSize:11,color:"#6b7280",fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap"}}>
-          {filtered.length} parcels · page {page+1}/{Math.max(1,totalPages)}
+          {filtered.length} parcels  page {page+1}/{Math.max(1,totalPages)}
         </span>
       </div>
 
       {/* Cards */}
       <div style={{padding:"20px 24px",maxWidth:1400,margin:"0 auto"}}>
-        {paginated.length===0?(
+        {archiveEmpty?(
           <div style={{textAlign:"center",padding:"60px 20px",color:"#9ca3af"}}>
-            <div style={{fontSize:32,marginBottom:12}}>🔍</div>
+            <div style={{fontSize:32,marginBottom:12}}>&#9203;</div>
+            <div style={{fontSize:15,color:"#60a5fa",fontFamily:"'DM Mono',monospace",marginBottom:8}}>Loading past week data...</div>
+            <div style={{fontSize:12,color:"#6b7280"}}>Fetching parcel cards from archive.</div>
+          </div>
+        ):paginated.length===0?(
+          <div style={{textAlign:"center",padding:"60px 20px",color:"#9ca3af"}}>
+            <div style={{fontSize:32,marginBottom:12}}>&#128269;</div>
             <div style={{fontSize:14,fontFamily:"'DM Mono',monospace"}}>No parcels match your filters</div>
           </div>
-        ):(
+                ):(
           <div style={{display:"grid",gridTemplateColumns:"1fr",gap:18,maxWidth:860,margin:"0 auto"}}>
             {paginated.map(p=>{
               const photoKey = String(p.parcelId).replace(/-1$/,"");
               const photoDataUrl = portalPhotos.get(photoKey) || portalPhotos.get(String(p.parcelId)) || null;
-              return <PropertyCard key={p.parcelId} parcel={p} status={statuses[p.parcelId]||null} onStatus={setStatus} windowId={portalWId} photoDataUrl={photoDataUrl}/>;
+              return <PropertyCard key={p.parcelId} parcel={p} status={statuses[p.parcelId]||null} onStatus={setStatus} windowId={portalWId} photoDataUrl={photoDataUrl} isPastWeek={isPastWeek}/>;
             })}
           </div>
         )}
         {totalPages>1&&(
           <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,marginTop:32,paddingBottom:32}}>
-            <button disabled={page===0} onClick={()=>setPage(p=>p-1)} style={{padding:"7px 16px",borderRadius:8,border:"1.5px solid #d1d5db",background:page===0?"#f9fafb":"#fff",cursor:page===0?"not-allowed":"pointer",color:page===0?"#9ca3af":"#374151",fontFamily:"'DM Mono',monospace",fontSize:12}}>← Prev</button>
+            <button disabled={page===0} onClick={()=>setPage(p=>p-1)} style={{padding:"7px 16px",borderRadius:8,border:"1.5px solid #d1d5db",background:page===0?"#f9fafb":"#fff",cursor:page===0?"not-allowed":"pointer",color:page===0?"#9ca3af":"#374151",fontFamily:"'DM Mono',monospace",fontSize:12}}> Back Prev</button>
             {Array.from({length:Math.min(totalPages,7)},(_,i)=>{
               const pNum=totalPages<=7?i:Math.max(0,Math.min(page-3,totalPages-7))+i;
               return <button key={pNum} onClick={()=>setPage(pNum)} style={{padding:"7px 12px",borderRadius:8,border:"1.5px solid",borderColor:page===pNum?"#2563eb":"#d1d5db",background:page===pNum?"#dbeafe":"#fff",color:page===pNum?"#1d4ed8":"#374151",fontFamily:"'DM Mono',monospace",fontSize:12,cursor:"pointer"}}>{pNum+1}</button>;
             })}
-            <button disabled={page===totalPages-1} onClick={()=>setPage(p=>p+1)} style={{padding:"7px 16px",borderRadius:8,border:"1.5px solid #d1d5db",background:page===totalPages-1?"#f9fafb":"#fff",cursor:page===totalPages-1?"not-allowed":"pointer",color:page===totalPages-1?"#9ca3af":"#374151",fontFamily:"'DM Mono',monospace",fontSize:12}}>Next →</button>
+            <button disabled={page===totalPages-1} onClick={()=>setPage(p=>p+1)} style={{padding:"7px 16px",borderRadius:8,border:"1.5px solid #d1d5db",background:page===totalPages-1?"#f9fafb":"#fff",cursor:page===totalPages-1?"not-allowed":"pointer",color:page===totalPages-1?"#9ca3af":"#374151",fontFamily:"'DM Mono',monospace",fontSize:12}}>Next  </button>
           </div>
         )}
       </div>
@@ -1312,7 +1399,7 @@ function App() {
   );
 }
 
-// ─── Root with API Key Provider ──────────────────────────────────────────────
+// --- Root with API Key Provider ----------------------------------------------
 function Root() {
   // API key can be pre-baked by build_portal.py into window.PRELOADED_API_KEY
   const prebakedKey = (window.PRELOADED_API_KEY || '').trim();
