@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MLS/CAMA Staff Review Portal â€” Stark County Auditor</title>
+  <title>MLS/CAMA Staff Review Portal — Stark County Auditor</title>
 
   <!-- React 18 -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -35,7 +35,7 @@
     window.GITHUB_PAGES_BASE = "https://jaymjeffries-cyber.github.io/cama-review-portal";
     // â”€â”€ Google Apps Script URL (shared status backend) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     window.INJECTED_SHARED_API_URL = "https://script.google.com/macros/s/AKfycbxv8Y30ThaDcxzCymkMxtMm3gTsmAnisF0yhZDI2au2VUNYc9Ypwkevat03tI1KimeP4w/exec";
-    </script>
+    </script>
 </head>
 <body>
   <div id="root"></div>
@@ -43,11 +43,11 @@
   <script type="text/babel" data-presets="react">
 const { useState, useCallback, useMemo, useRef, useEffect } = React;
 
-// â”€â”€ Auto-load from pre-baked data if present â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Auto-load from pre-baked data if present ────────────────────────────────
 const PRELOADED = window.PRELOADED_DATA || null;
 // XLSX loaded via CDN
 
-// â”€â”€â”€ Full effective age lookup table (YRBLT â†’ CDU â†’ EFFYR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Full effective age lookup table (YRBLT → CDU → EFFYR) ───────────────────
 const EFF_AGE_TABLE = {"2023":{"EX":2023,"VG":2019,"GD":2014,"AV":2007,"FR":1997,"PR":1987},"2022":{"EX":2023,"VG":2018,"GD":2013,"AV":2007,"FR":1996,"PR":1986},"2021":{"EX":2023,"VG":2018,"GD":2012,"AV":2006,"FR":1996,"PR":1985},"2020":{"EX":2023,"VG":2017,"GD":2012,"AV":2006,"FR":1995,"PR":1984},"2019":{"EX":2022,"VG":2017,"GD":2012,"AV":2005,"FR":1994,"PR":1983},"2018":{"EX":2022,"VG":2017,"GD":2011,"AV":2004,"FR":1993,"PR":1982},"2017":{"EX":2022,"VG":2016,"GD":2010,"AV":2004,"FR":1992,"PR":1981},"2016":{"EX":2022,"VG":2016,"GD":2010,"AV":2003,"FR":1992,"PR":1980},"2015":{"EX":2021,"VG":2015,"GD":2010,"AV":2003,"FR":1991,"PR":1979},"2014":{"EX":2021,"VG":2015,"GD":2009,"AV":2002,"FR":1990,"PR":1978},"2013":{"EX":2021,"VG":2015,"GD":2008,"AV":2001,"FR":1989,"PR":1977},"2012":{"EX":2020,"VG":2014,"GD":2008,"AV":2001,"FR":1988,"PR":1976},"2011":{"EX":2020,"VG":2014,"GD":2008,"AV":2000,"FR":1988,"PR":1975},"2010":{"EX":2020,"VG":2013,"GD":2007,"AV":2000,"FR":1987,"PR":1974},"2009":{"EX":2020,"VG":2013,"GD":2006,"AV":1999,"FR":1986,"PR":1973},"2008":{"EX":2019,"VG":2013,"GD":2006,"AV":1998,"FR":1985,"PR":1972},"2007":{"EX":2019,"VG":2012,"GD":2006,"AV":1998,"FR":1984,"PR":1971},"2006":{"EX":2019,"VG":2012,"GD":2005,"AV":1997,"FR":1984,"PR":1970},"2005":{"EX":2018,"VG":2011,"GD":2004,"AV":1997,"FR":1983,"PR":1969},"2004":{"EX":2018,"VG":2011,"GD":2004,"AV":1996,"FR":1982,"PR":1968},"2003":{"EX":2018,"VG":2011,"GD":2004,"AV":1995,"FR":1981,"PR":1967},"2002":{"EX":2017,"VG":2010,"GD":2003,"AV":1995,"FR":1980,"PR":1966},"2001":{"EX":2017,"VG":2010,"GD":2002,"AV":1994,"FR":1980,"PR":1965},"2000":{"EX":2017,"VG":2009,"GD":2002,"AV":1994,"FR":1979,"PR":1964},"1999":{"EX":2016,"VG":2009,"GD":2002,"AV":1993,"FR":1978,"PR":1963},"1998":{"EX":2016,"VG":2009,"GD":2001,"AV":1992,"FR":1977,"PR":1962},"1997":{"EX":2016,"VG":2008,"GD":2000,"AV":1992,"FR":1976,"PR":1961},"1996":{"EX":2016,"VG":2008,"GD":2000,"AV":1991,"FR":1976,"PR":1960},"1995":{"EX":2015,"VG":2007,"GD":2000,"AV":1991,"FR":1975,"PR":1959},"1994":{"EX":2015,"VG":2007,"GD":1999,"AV":1990,"FR":1974,"PR":1958},"1993":{"EX":2015,"VG":2007,"GD":1998,"AV":1989,"FR":1973,"PR":1957},"1992":{"EX":2014,"VG":2006,"GD":1998,"AV":1989,"FR":1972,"PR":1956},"1991":{"EX":2014,"VG":2006,"GD":1998,"AV":1988,"FR":1972,"PR":1955},"1990":{"EX":2014,"VG":2005,"GD":1997,"AV":1988,"FR":1971,"PR":1954},"1989":{"EX":2014,"VG":2005,"GD":1996,"AV":1987,"FR":1970,"PR":1953},"1988":{"EX":2013,"VG":2005,"GD":1996,"AV":1986,"FR":1969,"PR":1952},"1987":{"EX":2013,"VG":2004,"GD":1996,"AV":1986,"FR":1968,"PR":1951},"1986":{"EX":2013,"VG":2004,"GD":1995,"AV":1985,"FR":1968,"PR":1950},"1985":{"EX":2012,"VG":2003,"GD":1994,"AV":1985,"FR":1967,"PR":1949},"1984":{"EX":2012,"VG":2003,"GD":1994,"AV":1984,"FR":1966,"PR":1948},"1983":{"EX":2012,"VG":2003,"GD":1994,"AV":1983,"FR":1965,"PR":1947},"1982":{"EX":2011,"VG":2002,"GD":1993,"AV":1983,"FR":1964,"PR":1946},"1981":{"EX":2011,"VG":2002,"GD":1992,"AV":1982,"FR":1964,"PR":1945},"1980":{"EX":2011,"VG":2001,"GD":1992,"AV":1982,"FR":1963,"PR":1944},"1979":{"EX":2010,"VG":2001,"GD":1992,"AV":1981,"FR":1962,"PR":1944},"1978":{"EX":2010,"VG":2001,"GD":1991,"AV":1980,"FR":1961,"PR":1944},"1977":{"EX":2010,"VG":2000,"GD":1990,"AV":1980,"FR":1960,"PR":1944},"1976":{"EX":2010,"VG":2000,"GD":1990,"AV":1979,"FR":1960,"PR":1944},"1975":{"EX":2009,"VG":1999,"GD":1990,"AV":1979,"FR":1959,"PR":1944},"1974":{"EX":2009,"VG":1999,"GD":1989,"AV":1978,"FR":1958,"PR":1944},"1973":{"EX":2009,"VG":1999,"GD":1988,"AV":1977,"FR":1957,"PR":1944},"1972":{"EX":2008,"VG":1998,"GD":1988,"AV":1977,"FR":1956,"PR":1944},"1971":{"EX":2008,"VG":1998,"GD":1988,"AV":1976,"FR":1956,"PR":1944},"1970":{"EX":2008,"VG":1997,"GD":1987,"AV":1976,"FR":1955,"PR":1944},"1969":{"EX":2008,"VG":1997,"GD":1986,"AV":1975,"FR":1954,"PR":1944},"1968":{"EX":2007,"VG":1997,"GD":1986,"AV":1974,"FR":1953,"PR":1944},"1967":{"EX":2007,"VG":1996,"GD":1986,"AV":1974,"FR":1952,"PR":1944},"1966":{"EX":2007,"VG":1996,"GD":1985,"AV":1973,"FR":1952,"PR":1944},"1965":{"EX":2006,"VG":1995,"GD":1984,"AV":1973,"FR":1951,"PR":1944},"1964":{"EX":2006,"VG":1995,"GD":1984,"AV":1972,"FR":1950,"PR":1944},"1963":{"EX":2006,"VG":1995,"GD":1984,"AV":1971,"FR":1949,"PR":1944},"1962":{"EX":2005,"VG":1994,"GD":1983,"AV":1971,"FR":1948,"PR":1944},"1961":{"EX":2005,"VG":1994,"GD":1982,"AV":1970,"FR":1948,"PR":1944},"1960":{"EX":2005,"VG":1993,"GD":1982,"AV":1970,"FR":1947,"PR":1944},"1959":{"EX":2004,"VG":1993,"GD":1982,"AV":1969,"FR":1946,"PR":1944},"1958":{"EX":2004,"VG":1993,"GD":1981,"AV":1968,"FR":1945,"PR":1944},"1957":{"EX":2004,"VG":1992,"GD":1980,"AV":1968,"FR":1944,"PR":1944},"1956":{"EX":2004,"VG":1992,"GD":1980,"AV":1967,"FR":1944,"PR":1944},"1955":{"EX":2003,"VG":1991,"GD":1980,"AV":1967,"FR":1944,"PR":1944},"1954":{"EX":2003,"VG":1991,"GD":1979,"AV":1966,"FR":1944,"PR":1944},"1953":{"EX":2003,"VG":1991,"GD":1978,"AV":1965,"FR":1944,"PR":1944},"1952":{"EX":2002,"VG":1990,"GD":1978,"AV":1965,"FR":1944,"PR":1944},"1951":{"EX":2002,"VG":1990,"GD":1978,"AV":1964,"FR":1944,"PR":1944},"1950":{"EX":2002,"VG":1989,"GD":1977,"AV":1964,"FR":1944,"PR":1944},"1949":{"EX":2002,"VG":1989,"GD":1976,"AV":1963,"FR":1944,"PR":1944},"1948":{"EX":2001,"VG":1989,"GD":1976,"AV":1962,"FR":1944,"PR":1944},"1947":{"EX":2001,"VG":1988,"GD":1976,"AV":1962,"FR":1944,"PR":1944},"1946":{"EX":2001,"VG":1988,"GD":1975,"AV":1961,"FR":1944,"PR":1944},"1945":{"EX":2000,"VG":1987,"GD":1974,"AV":1961,"FR":1944,"PR":1944}};
 const EFF_AGE_FLOOR = {"EX":2000,"VG":1987,"GD":1974,"AV":1960,"FR":1944,"PR":1944};
 
@@ -57,7 +57,7 @@ function getAllCduSuggestions(yrblt) {
   return EFF_AGE_TABLE[yr] || EFF_AGE_FLOOR;
 }
 
-// â”€â”€â”€ CDU / Grade config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── CDU / Grade config ───────────────────────────────────────────────────────
 const CDU_CONFIG = {
   EX: { label:"EX", full:"Excellent", color:"#166534", bg:"#dcfce7", border:"#86efac" },
   VG: { label:"VG", full:"Very Good",  color:"#065f46", bg:"#d1fae5", border:"#6ee7b7" },
@@ -68,7 +68,7 @@ const CDU_CONFIG = {
 };
 const CDU_ORDER = ["EX","VG","GD","AV","FR","PR"];
 
-// CDU numeric mapping for display (1=EX â€¦ 5=PR)
+// CDU numeric mapping for display (1=EX … 5=PR)
 const CDU_TO_NUM = { EX:1, VG:2, GD:2, AV:3, FR:4, PR:5 };
 const NUM_TO_CDU_LABEL = { 1:"Excellent", 2:"Good", 3:"Average", 4:"Fair", 5:"Poor" };
 
@@ -80,10 +80,10 @@ const STATUS_CONFIG = {
 const STATUSES = Object.keys(STATUS_CONFIG);
 
 
-// â”€â”€â”€ Shared API Key Context â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Shared API Key Context ───────────────────────────────────────────────────
 const ApiKeyContext = React.createContext('');
 
-// â”€â”€â”€ Parsers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Parsers ──────────────────────────────────────────────────────────────────
 function parseXlsx(buffer) {
   const wb = XLSX.read(buffer, { type:"array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -106,7 +106,7 @@ function normalizeRow(row, fileType) {
   const grade       = String(row["GRADE"] || "").trim();
   const cdu         = String(row["CDU"]   || "").trim().toUpperCase();
   const remarks     = String(row["Public_Remarks"] || "").trim();
-  // â”€â”€ NEW fields â”€â”€
+  // ── NEW fields ──
   const fixbath     = row["FIXBATH"] !== "" && row["FIXBATH"] != null ? Number(row["FIXBATH"]) : null;
   const fixhalf     = row["FIXHALF"] !== "" && row["FIXHALF"] != null ? Number(row["FIXHALF"]) : null;
   const sfla        = row["SFLA"]    !== "" && row["SFLA"]    != null ? Number(row["SFLA"])    : null;
@@ -151,14 +151,14 @@ function buildZillowUrl(address, city, zip) {
   return `https://www.zillow.com/homes/${clean(address)}-${clean(city)}-OH${zipClean?`-${zipClean}`:""}_rb/`;
 }
 
-// â”€â”€â”€ Extract parcel ID from photo filename (e.g. "102774-1.jpg" â†’ "102774") â”€â”€
+// ─── Extract parcel ID from photo filename (e.g. "102774-1.jpg" → "102774") ──
 function photoKeyFromFilename(name) {
   const base = name.replace(/\.[^.]+$/, ""); // strip extension
   const match = base.match(/^(\d+)/);
   return match ? match[1] : base;
 }
 
-// â”€â”€â”€ Tiny shared components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tiny shared components ───────────────────────────────────────────────────
 function Dot({ color }) {
   return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:color,marginRight:6,flexShrink:0}} />;
 }
@@ -186,7 +186,7 @@ function LinkButton({ href, icon, label, accentColor, windowName }) {
   const handleClick = (e) => {
     e.preventDefault();
     // Chrome requires explicit width/height to open a true new window (not a tab)
-    // Same windowName = reuses that window each click â€” perfect for dedicated monitors
+    // Same windowName = reuses that window each click — perfect for dedicated monitors
     const features = 'width=1400,height=900,left=100,top=50,toolbar=yes,menubar=yes,scrollbars=yes,resizable=yes,location=yes,status=yes';
     window.open(href, windowName || label, features);
   };
@@ -199,7 +199,7 @@ function LinkButton({ href, icon, label, accentColor, windowName }) {
   );
 }
 
-// â”€â”€â”€ Effective Age Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Effective Age Panel ──────────────────────────────────────────────────────
 function EffectiveAgePanel({ yrblt, effyr, cdu, grade }) {
   const suggestions = useMemo(() => getAllCduSuggestions(yrblt), [yrblt]);
   if (!yrblt || !suggestions) return null;
@@ -209,8 +209,8 @@ function EffectiveAgePanel({ yrblt, effyr, cdu, grade }) {
         <span style={{fontSize:11,fontWeight:700,color:"#475569",fontFamily:"'DM Mono',monospace",letterSpacing:"0.06em"}}>EFFECTIVE AGE SUGGESTIONS</span>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:11,color:"#64748b",fontFamily:"'DM Mono',monospace"}}>YRBLT <strong style={{color:"#1e293b"}}>{yrblt}</strong></span>
-          <span style={{fontSize:11,color:"#64748b",fontFamily:"'DM Mono',monospace"}}>GRADE <strong style={{color:"#1e293b"}}>{grade||"â€”"}</strong></span>
-          <span style={{fontSize:11,color:"#64748b",fontFamily:"'DM Mono',monospace"}}>Current EFFYR <strong style={{color:"#1e293b"}}>{effyr||"â€”"}</strong></span>
+          <span style={{fontSize:11,color:"#64748b",fontFamily:"'DM Mono',monospace"}}>GRADE <strong style={{color:"#1e293b"}}>{grade||"—"}</strong></span>
+          <span style={{fontSize:11,color:"#64748b",fontFamily:"'DM Mono',monospace"}}>Current EFFYR <strong style={{color:"#1e293b"}}>{effyr||"—"}</strong></span>
         </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:0}}>
@@ -223,9 +223,9 @@ function EffectiveAgePanel({ yrblt, effyr, cdu, grade }) {
             <div key={duCode} style={{padding:"8px 6px",textAlign:"center",background:isCurrent?cfg.bg:"#fff",borderRight:i<5?"1px solid #e2e8f0":"none",position:"relative",outline:isCurrent?`2px solid ${cfg.border}`:"none",outlineOffset:-1,zIndex:isCurrent?1:0}}>
               <div style={{fontSize:10,fontWeight:700,fontFamily:"'DM Mono',monospace",color:isCurrent?cfg.color:"#94a3b8",letterSpacing:"0.06em",marginBottom:2}}>{duCode}</div>
               <div style={{fontSize:9,color:isCurrent?cfg.color:"#cbd5e1",fontFamily:"'DM Sans',sans-serif",marginBottom:4,opacity:0.8}}>{cfg.full}</div>
-              <div style={{fontSize:18,fontWeight:800,fontFamily:"'DM Mono',monospace",color:isCurrent?cfg.color:"#94a3b8",letterSpacing:"-0.01em"}}>{sugEff??"â€”"}</div>
+              <div style={{fontSize:18,fontWeight:800,fontFamily:"'DM Mono',monospace",color:isCurrent?cfg.color:"#94a3b8",letterSpacing:"-0.01em"}}>{sugEff??"—"}</div>
               {isCurrent&&<div style={{marginTop:4,fontSize:8,fontWeight:700,fontFamily:"'DM Mono',monospace",color:cfg.color,letterSpacing:"0.05em",background:cfg.border+"33",borderRadius:3,padding:"1px 4px",display:"inline-block"}}>CURRENT</div>}
-              {effChanged&&<div style={{marginTop:2,fontSize:8,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"#dc2626",letterSpacing:"0.04em"}}>âš  was {effyr}</div>}
+              {effChanged&&<div style={{marginTop:2,fontSize:8,fontWeight:700,fontFamily:"'DM Mono',monospace",color:"#dc2626",letterSpacing:"0.04em"}}>⚠ was {effyr}</div>}
             </div>
           );
         })}
@@ -234,7 +234,7 @@ function EffectiveAgePanel({ yrblt, effyr, cdu, grade }) {
   );
 }
 
-// â”€â”€â”€ AI Grade/Condition Suggestion Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── AI Grade/Condition Suggestion Panel ──────────────────────────────────────
 function GradeSuggestPanel({ parcel, photoDataUrl }) {
   const sharedApiKey = React.useContext(ApiKeyContext);
   const [state,      setState]      = useState("idle");  // idle | loading | result | error
@@ -255,83 +255,83 @@ function GradeSuggestPanel({ parcel, photoDataUrl }) {
 
     const textPrompt = `You are a certified property appraiser assistant for the Stark County Auditor's Office in Ohio. Suggest a Grade and Condition based on all available evidence.
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 GRADE SCALE (2024 Stark County)
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-X+/X/X-  Excellent   â€” architect-designed, exceptional custom materials
-A+/A/A-  Very Good   â€” high-quality, custom ornamentation, premium finishes
-B+/B/B-  Good        â€” above-average, upgraded materials
-C+/C/C-  Average     â€” mass-produced, meets code, stock materials
-D        Fair        â€” below-average materials, plain interior
-E        Low         â€” basic minimum code
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+X+/X/X-  Excellent   — architect-designed, exceptional custom materials
+A+/A/A-  Very Good   — high-quality, custom ornamentation, premium finishes
+B+/B/B-  Good        — above-average, upgraded materials
+C+/C/C-  Average     — mass-produced, meets code, stock materials
+D        Fair        — below-average materials, plain interior
+E        Low         — basic minimum code
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-CONDITION SCALE (1â€“5)
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-1 Excellent  â€” near new, 10â€“12 pluses
-2 Good       â€” well maintained, 4â€“9 pluses
-3 Average    â€” normal wear, 0â€“3 pluses/minuses
-4 Fair       â€” deferred maintenance, 4â€“9 minuses
-5 Poor       â€” major repairs needed, 10â€“12 minuses
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONDITION SCALE (1–5)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1 Excellent  — near new, 10–12 pluses
+2 Good       — well maintained, 4–9 pluses
+3 Average    — normal wear, 0–3 pluses/minuses
+4 Fair       — deferred maintenance, 4–9 minuses
+5 Poor       — major repairs needed, 10–12 minuses
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-STARK COUNTY EMPIRICAL DATA â€” 355 REVIEWED PARCELS
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STARK COUNTY EMPIRICAL DATA — 355 REVIEWED PARCELS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 These are ACTUAL appraiser decisions from this office. Weight heavily.
 
 CHANGE RATES:
 - Appraisers changed CDU on 35% of parcels, Grade on 12%
-- Most common CDU changes: AVâ†’GD (46x), GDâ†’AV (31x), VGâ†’GD (14x), AVâ†’FR (13x)
-- Most common Grade changes: C+â†”C (10x each), B-â†’C+ (8x)
-- When in doubt between two CDU values, the data favors GD or AV â€” these are by far the most common outcomes
+- Most common CDU changes: AV→GD (46x), GD→AV (31x), VG→GD (14x), AV→FR (13x)
+- Most common Grade changes: C+↔C (10x each), B-→C+ (8x)
+- When in doubt between two CDU values, the data favors GD or AV — these are by far the most common outcomes
 
 HARD NEGATIVE LANGUAGE = STRONGEST SIGNAL:
-- "Estate sale / cash only / sold as-is / vacant / abandoned" â†’ 88% change rate, 75% CDU change
-- These phrases = almost certainly Condition 4â€“5 (FR/PR). Do not soften this.
+- "Estate sale / cash only / sold as-is / vacant / abandoned" → 88% change rate, 75% CDU change
+- These phrases = almost certainly Condition 4–5 (FR/PR). Do not soften this.
 
 SOFT NEGATIVE LANGUAGE = RELIABLE DOWNGRADE SIGNAL:
-- "Opportunity / potential / investor / as-is / TLC / fixer / elbow grease" â†’ 48% change rate vs 41% baseline
-- "opportunity" appeared in 43% of CDU downgrades â€” it is the single strongest downgrade word in Stark County data
-- "investor" appeared in 17% of downgrades â€” 2.4x its baseline rate
-- "as-is" appeared in 8% of downgrades â€” 4x its baseline rate
+- "Opportunity / potential / investor / as-is / TLC / fixer / elbow grease" → 48% change rate vs 41% baseline
+- "opportunity" appeared in 43% of CDU downgrades — it is the single strongest downgrade word in Stark County data
+- "investor" appeared in 17% of downgrades — 2.4x its baseline rate
+- "as-is" appeared in 8% of downgrades — 4x its baseline rate
 - Rule: Any soft negative language = lean toward FR unless photo contradicts
 
 UPGRADE TRIGGERS (what actually drove CDU upgrades in this office):
-- "remodeled" â†’ 28% of all CDU upgrades (2x its baseline rate) â€” MEANINGFUL signal
-- "move-in ready" â†’ 28% of CDU upgrades (nearly 2x baseline) â€” meaningful when combined with photo evidence
-- "renovated" â†’ 23% of upgrades (3x baseline) â€” strong signal
-- "new furnace" â†’ 13% of upgrades (2x baseline) â€” systems upgrades matter
-- "new windows" â†’ 12% of upgrades (2.4x baseline) â€” meaningful
-- "updated kitchen" â†’ 15% of upgrades (2x baseline)
-- "updated bath" â†’ 12% of upgrades (2x baseline)
-- "stainless" alone â†’ 23% of upgrades but only 1.4x baseline â€” cosmetic, less meaningful alone
-- "hardwood" alone â†’ only 12% of upgrades but BELOW baseline rate â€” ignore as upgrade signal
+- "remodeled" → 28% of all CDU upgrades (2x its baseline rate) — MEANINGFUL signal
+- "move-in ready" → 28% of CDU upgrades (nearly 2x baseline) — meaningful when combined with photo evidence
+- "renovated" → 23% of upgrades (3x baseline) — strong signal
+- "new furnace" → 13% of upgrades (2x baseline) — systems upgrades matter
+- "new windows" → 12% of upgrades (2.4x baseline) — meaningful
+- "updated kitchen" → 15% of upgrades (2x baseline)
+- "updated bath" → 12% of upgrades (2x baseline)
+- "stainless" alone → 23% of upgrades but only 1.4x baseline — cosmetic, less meaningful alone
+- "hardwood" alone → only 12% of upgrades but BELOW baseline rate — ignore as upgrade signal
 
 YEAR BUILT PATTERNS (actual Stark County outcomes):
-- CDU upgraded parcels:   median YRBLT 1941 â€” older homes CAN be upgraded if truly renovated
+- CDU upgraded parcels:   median YRBLT 1941 — older homes CAN be upgraded if truly renovated
 - CDU downgraded parcels: median YRBLT 1960
 - CDU unchanged parcels:  median YRBLT 1960
-- Age alone does not determine CDU â€” condition of upkeep does
+- Age alone does not determine CDU — condition of upkeep does
 
-LOCATION/SCHOOL FLUFF â€” IGNORE COMPLETELY:
+LOCATION/SCHOOL FLUFF — IGNORE COMPLETELY:
 - "Great location / award-winning schools / minutes from shopping / desirable / sought-after"
-- These appeared in 45% of changed AND unchanged parcels equally â€” zero predictive value
+- These appeared in 45% of changed AND unchanged parcels equally — zero predictive value
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EVIDENCE WEIGHTING HIERARCHY
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-1. PHOTO â€” highest weight. Roof, siding, windows, landscaping, overall upkeep. If photo shows deferred maintenance, trust it over ANY positive remarks language.
-2. HARD NEGATIVE LANGUAGE â€” nearly always means FR/PR regardless of other language
-3. SPECIFIC NAMED SYSTEM UPDATES â€” "remodeled / renovated / new furnace / new windows / updated kitchen+bath" in combination = real upgrade signal
-4. SOFT NEGATIVE LANGUAGE â€” "opportunity/investor/as-is" = strong lean toward FR
-5. POSITIVE GENERIC LANGUAGE â€” lowest weight. "Beautifully updated / move-in ready / immaculate" appeared on AV and FR properties at high rates. Do NOT use alone to suggest GD or VG.
-6. COSMETIC ONLY â€” "fresh paint / new carpet / stainless / hardwood" alone = no CDU change warranted
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PHOTO — highest weight. Roof, siding, windows, landscaping, overall upkeep. If photo shows deferred maintenance, trust it over ANY positive remarks language.
+2. HARD NEGATIVE LANGUAGE — nearly always means FR/PR regardless of other language
+3. SPECIFIC NAMED SYSTEM UPDATES — "remodeled / renovated / new furnace / new windows / updated kitchen+bath" in combination = real upgrade signal
+4. SOFT NEGATIVE LANGUAGE — "opportunity/investor/as-is" = strong lean toward FR
+5. POSITIVE GENERIC LANGUAGE — lowest weight. "Beautifully updated / move-in ready / immaculate" appeared on AV and FR properties at high rates. Do NOT use alone to suggest GD or VG.
+6. COSMETIC ONLY — "fresh paint / new carpet / stainless / hardwood" alone = no CDU change warranted
 
-PHOTO vs REMARKS CONFLICT: If photo shows worn exterior but remarks claim "move-in ready" â€” TRUST THE PHOTO. Note the conflict in rationale.
+PHOTO vs REMARKS CONFLICT: If photo shows worn exterior but remarks claim "move-in ready" — TRUST THE PHOTO. Note the conflict in rationale.
 
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PROPERTY DATA
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Address: ${parcel.address}, ${parcel.city} OH ${parcel.zip}
 Year Built: ${parcel.yrblt || "unknown"}
 Above-Grade Sq Ft (SFLA): ${parcel.sfla != null ? parcel.sfla : "unknown"}
@@ -339,16 +339,16 @@ ${bathStr ? `Bathrooms: ${bathStr}` : ""}
 Current CAMA Grade: ${parcel.grade || "unknown"}
 Current CAMA CDU: ${parcel.cdu || "unknown"}
 MLS Public Remarks: ${parcel.remarks || "(none provided)"}
-${hasPhoto ? "Front exterior photo attached â€” weight this heavily." : "No photo â€” reduce confidence, rely on remarks and year built only."}
+${hasPhoto ? "Front exterior photo attached — weight this heavily." : "No photo — reduce confidence, rely on remarks and year built only."}
 
-Respond ONLY with valid JSON â€” no markdown, no extra text:
+Respond ONLY with valid JSON — no markdown, no extra text:
 {
   "suggestedGrade": "e.g. B+",
   "suggestedCondition": 3,
   "conditionLabel": "e.g. Average",
   "gradeConfidence": "Low|Moderate|High",
   "conditionConfidence": "Low|Moderate|High",
-  "rationale": "2â€“3 sentences. Cite the specific evidence used, flag any realtor bias detected, and note any photo vs. remarks conflict."
+  "rationale": "2–3 sentences. Cite the specific evidence used, flag any realtor bias detected, and note any photo vs. remarks conflict."
 }`
 
     try {
@@ -866,7 +866,7 @@ function getISOWeekKey(date = new Date()) {
 }
 
 function weekKeyToLabel(key) {
-  // "2026-W10" â†’ "Week of Mar 2, 2026"
+  // "2026-W10" → "Week of Mar 2, 2026"
   const [year, w] = key.split("-W");
   const jan4 = new Date(Date.UTC(Number(year), 0, 4));
   const weekNum = Number(w);
@@ -876,7 +876,7 @@ function weekKeyToLabel(key) {
   return `Week of ${monday.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"})}`;
 }
 
-// â”€â”€â”€ Week Selector Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Week Selector Panel ──────────────────────────────────────────────────────
 function WeekSelectorPanel({ sessions, activeWeek, onSelect, onNewWeek }) {
   const sorted = Object.keys(sessions).sort().reverse();
   if (sorted.length === 0) return null;
@@ -1425,7 +1425,7 @@ function Root() {
       <div style={{position:'fixed',bottom:16,right:16,zIndex:9999,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
         {keySaved && (
           <div style={{background:'#065f46',color:'#d1fae5',padding:'6px 12px',borderRadius:8,fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:700,boxShadow:'0 2px 8px #0004'}}>
-            âœ“ API key saved
+            ✓ API key saved
           </div>
         )}
         {showKeyPanel && (
@@ -1433,8 +1433,8 @@ function Root() {
             <div style={{fontSize:11,color:'#7dd3fc',fontFamily:"'DM Mono',monospace",letterSpacing:'0.08em',marginBottom:8}}>ANTHROPIC API KEY</div>
             <div style={{fontSize:10,color:'#64748b',fontFamily:"'DM Mono',monospace",marginBottom:10,lineHeight:1.5}}>
               {prebakedKey
-                ? <span style={{color:'#4ade80'}}>âœ“ Key pre-loaded by admin â€” AI suggestions are ready to use.</span>
-                : <span>Set by office admin. Staff do not need to enter this.<br/>Key is stored in memory only â€” cleared on page refresh.</span>
+                ? <span style={{color:'#4ade80'}}>✓ Key pre-loaded by admin — AI suggestions are ready to use.</span>
+                : <span>Set by office admin. Staff do not need to enter this.<br/>Key is stored in memory only — cleared on page refresh.</span>
               }
             </div>
             <input
@@ -1458,9 +1458,9 @@ function Root() {
           </div>
         )}
         <button onClick={() => setShowKeyPanel(k => !k)}
-          title={apiKey ? (prebakedKey ? "AI ready â€” pre-loaded by admin" : "API key set â€” click to change") : "Set API key for AI suggestions"}
+          title={apiKey ? (prebakedKey ? "AI ready — pre-loaded by admin" : "API key set — click to change") : "Set API key for AI suggestions"}
           style={{width:40,height:40,borderRadius:'50%',border:'none',background:apiKey?'#059669':'#334155',color:'#fff',fontSize:16,cursor:'pointer',boxShadow:'0 2px 8px #0004',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.2s'}}>
-          {apiKey ? 'ðŸ”‘' : 'âš™ï¸'}
+          {apiKey ? '🔑' : '🧠'}
         </button>
       </div>
       <App />
