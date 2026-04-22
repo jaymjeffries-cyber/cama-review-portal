@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SC Appraisal · MLS/CAMA Review Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a1628;
+      --surface:  #111f38;
+      --border:   #1e3358;
+      --accent:   #38bdf8;
+      --accent2:  #818cf8;
+      --green:    #34d399;
+      --amber:    #fbbf24;
+      --red:      #f87171;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --card-bg:  #0f1c30;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid + glow ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.25;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      top: -30vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80vw;
+      height: 60vh;
+      background: radial-gradient(ellipse at center, #1e40af33 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #0a162888;
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+    }
+    nav .inner {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    nav .logo {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    nav .logo span { color: var(--muted); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 90px 0 60px;
+      text-align: center;
+    }
+    .hero-eyebrow {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: #38bdf811;
+      border: 1px solid #38bdf833;
+      border-radius: 99px;
+      padding: 4px 14px;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(36px, 6vw, 60px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: #f8fafc;
+      margin-bottom: 20px;
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 16px;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 520px;
+      margin: 0 auto 36px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 14px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.2s;
+      box-shadow: 0 4px 24px #2563eb44;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px #2563eb66;
+    }
+    .btn-primary .arrow {
+      transition: transform 0.2s;
+    }
+    .btn-primary:hover .arrow { transform: translateX(4px); }
+
+    /* ── Status chips ── */
+    .chips {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 28px;
+    }
+    .chip {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid;
+    }
+    .chip-green  { color: #065f46; background: #d1fae5; border-color: #6ee7b7; }
+    .chip-blue   { color: #1e3a8a; background: #dbeafe; border-color: #93c5fd; }
+    .chip-amber  { color: #92400e; background: #fef3c7; border-color: #fcd34d; }
+    .chip-purple { color: #4c1d95; background: #ede9fe; border-color: #c4b5fd; }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+    }
+
+    /* ── Features grid ── */
+    .features {
+      padding: 64px 0;
+    }
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feature-card:hover {
+      border-color: #38bdf855;
+      transform: translateY(-2px);
+    }
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .feature-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .feature-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── How it works ── */
+    .how {
+      padding: 0 0 64px;
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+    .steps::before {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 20px;
+      bottom: 20px;
+      width: 1px;
+      background: linear-gradient(to bottom, #38bdf8, #818cf8, #38bdf800);
+    }
+    .step {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      padding: 16px 0;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      position: relative;
+      z-index: 1;
+    }
+    .step-content h3 {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+      padding-top: 10px;
+    }
+    .step-content p {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .step-content code {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+
+    /* ── CTA bottom ── */
+    .cta {
+      padding: 64px 0;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+    .cta h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 800;
+      color: #f8fafc;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+    .cta p {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Pulse animation on the launch button ── */
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 #2563eb55; }
+      70%  { box-shadow: 0 0 0 12px #2563eb00; }
+      100% { box-shadow: 0 0 0 0 #2563eb00; }
+    }
+    .btn-primary { animation: pulse-ring 2.5s ease-out infinite; }
+    .btn-primary:hover { animation: none; }
+
+    /* ── Fade-in on scroll ── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="inner">
+      <div class="logo">SC Appraisal <span>· Assessment Division</span></div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.06em;">STARK COUNTY AUDITOR'S OFFICE</div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="wrap">
+    <section class="hero fade-in">
+      <div class="hero-eyebrow">Internal Staff Tool · Property Assessment</div>
+      <h1>MLS / CAMA<br/><em>Staff Review Portal</em></h1>
+      <p>Upload weekly MLS comparison data, review field mismatches, check effective age suggestions, and get AI-assisted Grade &amp; Condition recommendations — all in one place.</p>
+      <a href="review_portal.html" class="btn-primary">
+        Open Review Portal <span class="arrow">→</span>
+      </a>
+      <div class="chips">
+        <span class="chip chip-green">✓ Reviewed</span>
+        <span class="chip chip-blue">🚗 Field Visit</span>
+        <span class="chip chip-amber">⚑ Flagged</span>
+        <span class="chip chip-purple">✦ AI Grade &amp; Condition</span>
+      </div>
+    </section>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- Features -->
+  <div class="wrap">
+    <section class="features">
+      <div class="section-label fade-in">What's inside</div>
+      <div class="features-grid">
+        <div class="feature-card fade-in">
+          <span class="feature-icon">📂</span>
+          <div class="feature-title">Weekly Data Upload</div>
+          <p class="feature-desc">Drop in your value mismatch and perfect match Excel files. Photos load from your existing MLS photo folder.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <span class="feature-icon">⚠️</span>
+          <div class="feature-title">Mismatch Review</div>
+          <p class="feature-desc">See every MLS vs. CAMA field discrepancy in a clean table — beds, baths, square footage, and more.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <span class="feature-icon">📅</span>
+          <div class="feature-title">Effective Age Grid</div>
+          <p class="feature-desc">Full YRBLT × CDU lookup for every parcel. Highlights when the current EFFYR differs from the table suggestion.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <span class="feature-icon">🤖</span>
+          <div class="feature-title">AI Grade &amp; Condition</div>
+          <p class="feature-desc">One-click AI suggestion using MLS remarks, property data, and front exterior photo. Confidence rated Low / Moderate / High.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <span class="feature-icon">🗓️</span>
+          <div class="feature-title">Multi-Week Sessions</div>
+          <p class="feature-desc">Upload a new batch without losing last week's review work. Switch between weeks from the home screen.</p>
+        </div>
+        <div class="feature-card fade-in">
+          <span class="feature-icon">↓</span>
+          <div class="feature-title">Export to Excel</div>
+          <p class="feature-desc">Download any week's review with statuses, suggested EFFYR, and all CDU columns pre-filled and ready for iasWorld.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- How it works -->
+  <div class="wrap">
+    <section class="how">
+      <div class="section-label fade-in" style="margin-top:64px;">Weekly workflow</div>
+      <div class="steps">
+        <div class="step fade-in">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Open the portal</h3>
+            <p>Click "Open Review Portal" above. The app runs entirely in your browser — nothing to install.</p>
+          </div>
+        </div>
+        <div class="step fade-in">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Upload this week's files</h3>
+            <p>Drop in your <code>value_mismatches</code> Excel, <code>perfect_matches</code> Excel, and optionally select all MLS photo files at once.</p>
+          </div>
+        </div>
+        <div class="step fade-in">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Review each parcel</h3>
+            <p>Work through cards. Mark each as <strong style="color:#34d399">Reviewed</strong>, <strong style="color:#60a5fa">Field Visit</strong>, or <strong style="color:#fbbf24">Flagged</strong>. Use AI suggestions on uncertain Grade/Condition cases.</p>
+          </div>
+        </div>
+        <div class="step fade-in">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Export &amp; carry over</h3>
+            <p>Hit <strong style="color:var(--accent)">↓ Export</strong> to download the completed spreadsheet. Next Monday, upload a new batch — previous week's statuses stay intact.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- CTA -->
+  <div class="wrap">
+    <section class="cta fade-in">
+      <h2>Ready to start reviewing?</h2>
+      <p>Opens in your browser — no login, no install required.</p>
+      <a href="review_portal.html" class="btn-primary">
+        Launch Portal <span class="arrow">→</span>
+      </a>
+    </section>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    STARK COUNTY AUDITOR'S OFFICE &nbsp;·&nbsp; ASSESSMENT DIVISION &nbsp;·&nbsp; INTERNAL USE ONLY
+  </footer>
+
+  <script>
+    // Fade-in on scroll
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>
