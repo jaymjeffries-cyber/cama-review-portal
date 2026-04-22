@@ -1,0 +1,22 @@
+# API keys and secrets
+*.txt
+Automation Domination/credentials.py
+Neighborhood Review Dashboard/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Weekly parcel data folders (raw Excel/photo data)
+3-*/
+4-*/
+Manual Test*/
+MLSvsCAMA/
+ZillowPhotos/
+
+# Claude session data
+.claude/
+
+# Large generated portal (built each week by build_portal.py)
+# Remove this line if you want to host review_portal.html on GitHub Pages
+# review_portal.html
