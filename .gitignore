@@ -1,22 +1,18 @@
-# API keys and secrets
-*.txt
-Automation Domination/credentials.py
+# Everything except the portal and archive data
+Automation Domination/
+CAMAvsMLSv6-main/
+MLS Scraper/
 Neighborhood Review Dashboard/
-
-# Python cache
-__pycache__/
+build_portal.py
+review_portal_template.html
+Code.gs
+*.txt
+*.py
 *.pyc
-
-# Weekly parcel data folders (raw Excel/photo data)
+__pycache__/
 3-*/
 4-*/
 Manual Test*/
 MLSvsCAMA/
 ZillowPhotos/
-
-# Claude session data
 .claude/
-
-# Large generated portal (built each week by build_portal.py)
-# Remove this line if you want to host review_portal.html on GitHub Pages
-# review_portal.html
